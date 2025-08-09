@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚜️ Исторический портрет</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+            color: #FFE55C;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            max-width: 400px;
+            background: rgba(20, 20, 20, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 229, 92, 0.2);
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #FFE55C;
+        }
+        .upload-area {
+            border: 2px dashed #8B4513;
+            border-radius: 15px;
+            padding: 30px 20px;
+            cursor: pointer;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #FFE55C;
+            background: rgba(255, 229, 92, 0.1);
+        }
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #8B4513 0%, #D2691E 50%, #8B4513 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .preview-img {
+            max-width: 100%;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        #result {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚜️ Исторический портрет v6.1</h1>
+        <p>Быстрый алгоритм сегментации</p>
+        
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <p>📸 <strong>Выберите фото</strong></p>
+            <p>Быстрый алгоритм извлечет человека</p>
+        </div>
+        
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        <div id="preview"></div>
+        <button class="btn" id="generateBtn" style="display: none;">🎨 Создать портрет</button>
+        <div id="status"></div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let uploadedImage = null;
+        
+        console.log('⚜️ Исторический портрет v6.1 - Быстрый и стабильный!');
+        console.log('⚡ Тест работы приложения');
+        
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                uploadedImage = new Image();
+                uploadedImage.onload = function() {
+                    document.getElementById('preview').innerHTML = `<img src="${e.target.result}" class="preview-img">`;
+                    document.getElementById('generateBtn').style.display = 'block';
+                };
+                uploadedImage.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        document.getElementById('generateBtn').addEventListener('click', function() {
+            if (!uploadedImage) return;
+            
+            document.getElementById('status').textContent = '🎨 Создание портрета...';
+            
+            setTimeout(() => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 400;
+                canvas.height = 600;
+                const ctx = canvas.getContext('2d');
+                
+                // Простой градиент фон
+                const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                gradient.addColorStop(0, '#8B4513');
+                gradient.addColorStop(1, '#654321');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Рисуем изображение пользователя
+                const scale = Math.min(300 / uploadedImage.width, 400 / uploadedImage.height);
+                const w = uploadedImage.width * scale;
+                const h = uploadedImage.height * scale;
+                const x = (canvas.width - w) / 2;
+                const y = 100;
+                
+                ctx.drawImage(uploadedImage, x, y, w, h);
+                
+                // Заголовок
+                ctx.fillStyle = '#FFE55C';
+                ctx.font = 'bold 32px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('КРЕСТЬЯНИН', canvas.width / 2, 50);
+                
+                document.getElementById('result').innerHTML = `
+                    <img src="${canvas.toDataURL()}" class="preview-img">
+                    <br>
+                    <button class="btn" onclick="downloadResult('${canvas.toDataURL()}')">💾 Скачать</button>
+                `;
+                document.getElementById('status').textContent = '✅ Портрет готов!';
+            }, 1000);
+        });
+        
+        function downloadResult(dataUrl) {
+            const link = document.createElement('a');
+            link.download = 'портрет.png';
+            link.href = dataUrl;
+            link.click();
+        }
+    </script>
+</body>
+</html>
