@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест ролей на мобильных</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+            color: #FFE55C;
+            margin: 0;
+            padding: 15px;
+        }
+        
+        .container {
+            max-width: 450px;
+            margin: 0 auto;
+            background: rgba(20, 20, 20, 0.95);
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .roles-section {
+            margin: 25px 0;
+            padding: 20px;
+            background: rgba(139, 69, 19, 0.1);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 229, 92, 0.2);
+        }
+        
+        .roles-title {
+            color: #FFE55C;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .roles-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        /* Мобильные устройства */
+        
+        @media (max-width: 768px) {
+            .roles-grid {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .role-card {
+                padding: 15px;
+                margin-bottom: 5px;
+            }
+            .role-emoji {
+                font-size: 24px;
+            }
+            .role-name {
+                font-size: 14px;
+            }
+            .container {
+                max-width: 100%;
+                padding: 15px;
+            }
+        }
+        /* Очень маленькие экраны */
+        
+        @media (max-width: 480px) {
+            .roles-grid {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+            .role-card {
+                padding: 12px;
+                margin-bottom: 3px;
+            }
+            .role-emoji {
+                font-size: 20px;
+            }
+            .role-name {
+                font-size: 12px;
+            }
+        }
+        /* Дополнительные стили для мобильных устройств */
+        
+        .mobile-device .roles-section {
+            margin: 15px 0;
+            padding: 15px;
+        }
+        
+        .mobile-device .roles-grid {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+        }
+        
+        .mobile-device .role-card {
+            padding: 15px !important;
+            margin-bottom: 5px !important;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .mobile-device .role-emoji {
+            font-size: 24px !important;
+            margin-right: 10px;
+        }
+        
+        .mobile-device .role-name {
+            font-size: 14px !important;
+            font-weight: 600;
+        }
+        
+        .role-card {
+            padding: 12px;
+            background: linear-gradient(135deg, rgba(139, 69, 19, 0.3) 0%, rgba(101, 67, 33, 0.3) 100%);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 229, 92, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .role-card:hover {
+            background: linear-gradient(135deg, rgba(255, 229, 92, 0.2) 0%, rgba(139, 69, 19, 0.3) 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 229, 92, 0.2);
+        }
+        
+        .role-card.selected {
+            background: linear-gradient(135deg, #DAA520 0%, #FFD700 100%);
+            color: #1a1a1a;
+            border-color: #FFE55C;
+            box-shadow: 0 4px 15px rgba(255, 229, 92, 0.4);
+        }
+        
+        .role-emoji {
+            font-size: 20px;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .role-name {
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .debug-info {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 12px;
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📱 Тест ролей на мобильных</h1>
+
+        <div class="debug-info">
+            <strong>Информация об устройстве:</strong><br> User Agent: <span id="userAgent"></span><br> Ширина экрана: <span id="screenWidth"></span>px<br> Мобильное устройство: <span id="isMobile"></span><br> Класс mobile-device: <span id="mobileClass"></span>
+        </div>
+
+        <div class="roles-section">
+            <div class="roles-title">👑 Выберите историческую роль:</div>
+            <div class="roles-grid" id="rolesGrid">
+                <!-- Роли будут добавлены через JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const roles = [{
+            id: 'peasant',
+            name: 'Крестьянин',
+            emoji: '🌾'
+        }, {
+            id: 'hussar',
+            name: 'Крылатый гусар',
+            emoji: '⚔️'
+        }, {
+            id: 'boyar',
+            name: 'Боярин',
+            emoji: '🏰'
+        }, {
+            id: 'prince',
+            name: 'Князь',
+            emoji: '👑'
+        }, {
+            id: 'merchant',
+            name: 'Купец',
+            emoji: '💰'
+        }, {
+            id: 'monk',
+            name: 'Монах',
+            emoji: '⛪'
+        }];
+
+        function initializeRoles() {
+            console.log('🎭 Инициализация ролей...');
+            const rolesGrid = document.getElementById('rolesGrid');
+
+            if (!rolesGrid) {
+                console.error('❌ Элемент rolesGrid не найден!');
+                return;
+            }
+
+            console.log('✅ Элемент rolesGrid найден, количество ролей:', roles.length);
+
+            roles.forEach(role => {
+                const roleCard = document.createElement('div');
+                roleCard.className = 'role-card';
+                roleCard.onclick = () => selectRole(role.id);
+                roleCard.innerHTML = `
+                    <span class="role-emoji">${role.emoji}</span>
+                    <div class="role-name">${role.name}</div>
+                `;
+                roleCard.id = `role-${role.id}`;
+                rolesGrid.appendChild(roleCard);
+                console.log('✅ Добавлена роль:', role.name);
+            });
+
+            selectRole('peasant');
+            console.log('🎭 Инициализация ролей завершена!');
+        }
+
+        function selectRole(roleId) {
+            document.querySelectorAll('.role-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.getElementById(`role-${roleId}`).classList.add('selected');
+            console.log('👑 Выбрана роль:', roleId);
+        }
+
+        function updateDebugInfo() {
+            document.getElementById('userAgent').textContent = navigator.userAgent;
+            document.getElementById('screenWidth').textContent = window.innerWidth;
+
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            document.getElementById('isMobile').textContent = isMobile ? 'Да' : 'Нет';
+
+            if (isMobile) {
+                document.body.classList.add('mobile-device');
+            }
+
+            document.getElementById('mobileClass').textContent = document.body.classList.contains('mobile-device') ? 'Добавлен' : 'Нет';
+        }
+
+        window.addEventListener('load', () => {
+            console.log('📱 Определение устройства...');
+
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            console.log('📱 Мобильное устройство:', isMobile);
+
+            if (isMobile) {
+                document.body.classList.add('mobile-device');
+                console.log('📱 Добавлен класс mobile-device');
+            }
+
+            updateDebugInfo();
+            initializeRoles();
+        });
+
+        window.addEventListener('resize', updateDebugInfo);
+    </script>
+</body>
+
+</html>

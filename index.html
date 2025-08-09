@@ -88,6 +88,79 @@
             gap: 10px;
             margin-bottom: 15px;
         }
+        /* Мобильные устройства */
+        
+        @media (max-width: 768px) {
+            .roles-grid {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .role-card {
+                padding: 15px;
+                margin-bottom: 5px;
+            }
+            .role-emoji {
+                font-size: 24px;
+            }
+            .role-name {
+                font-size: 14px;
+            }
+            .container {
+                max-width: 100%;
+                padding: 15px;
+            }
+        }
+        /* Очень маленькие экраны */
+        
+        @media (max-width: 480px) {
+            .roles-grid {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+            .role-card {
+                padding: 12px;
+                margin-bottom: 3px;
+            }
+            .role-emoji {
+                font-size: 20px;
+            }
+            .role-name {
+                font-size: 12px;
+            }
+        }
+        /* Дополнительные стили для мобильных устройств */
+        
+        .mobile-device .roles-section {
+            margin: 15px 0;
+            padding: 15px;
+        }
+        
+        .mobile-device .roles-grid {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+        }
+        
+        .mobile-device .role-card {
+            padding: 15px !important;
+            margin-bottom: 5px !important;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .mobile-device .role-emoji {
+            font-size: 24px !important;
+            margin-right: 10px;
+        }
+        
+        .mobile-device .role-name {
+            font-size: 14px !important;
+            font-weight: 600;
+        }
         
         .role-card {
             padding: 12px;
@@ -355,7 +428,16 @@
 
         // Инициализация ролей
         function initializeRoles() {
+            console.log('🎭 Инициализация ролей...');
             const rolesGrid = document.getElementById('rolesGrid');
+
+            if (!rolesGrid) {
+                console.error('❌ Элемент rolesGrid не найден!');
+                return;
+            }
+
+            console.log('✅ Элемент rolesGrid найден, количество ролей:', roles.length);
+
             roles.forEach(role => {
                 const roleCard = document.createElement('div');
                 roleCard.className = 'role-card';
@@ -366,10 +448,12 @@
                 `;
                 roleCard.id = `role-${role.id}`;
                 rolesGrid.appendChild(roleCard);
+                console.log('✅ Добавлена роль:', role.name);
             });
 
             // Выбираем крестьянина по умолчанию
             selectRole('peasant');
+            console.log('🎭 Инициализация ролей завершена!');
         }
 
         function selectRole(roleId) {
@@ -937,6 +1021,18 @@
 
         // Инициализация при загрузке
         window.addEventListener('load', () => {
+            console.log('📱 Определение устройства...');
+
+            // Проверка на мобильное устройство
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            console.log('📱 Мобильное устройство:', isMobile);
+
+            // Добавляем класс для мобильных устройств
+            if (isMobile) {
+                document.body.classList.add('mobile-device');
+                console.log('📱 Добавлен класс mobile-device');
+            }
+
             initializeRoles();
         });
     </script>
