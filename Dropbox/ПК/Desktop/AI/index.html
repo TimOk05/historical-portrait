@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Создавайте исторические портреты в стиле Речи Посполитой и Великого Княжества Литовского">
+    <title>⚜️ Исторический портрет</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#B8860B">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ИсторПортрет">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- TensorFlow.js и BodyPix для сегментации -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: radial-gradient(ellipse at top left, rgba(101, 67, 33, 0.08) 0%, transparent 50%), radial-gradient(ellipse at bottom right, rgba(139, 69, 19, 0.12) 0%, transparent 60%), linear-gradient(135deg, #050302 0%, #0a0805 25%, #1a0f0a 50%, #0a0805 75%, #050302 100%);
+            color: #F8F0E6;
+            font-family: 'Cinzel', serif;
+            min-height: 100vh;
+            padding: 15px;
+            overflow-x: hidden;
+            position: relative;
+        }
+        /* Декоративная сетка */
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: linear-gradient(90deg, rgba(184, 134, 11, 0.05) 1px, transparent 1px), linear-gradient(rgba(184, 134, 11, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .container {
+            max-width: 450px;
+            margin: 0 auto;
+            background: linear-gradient(145deg, rgba(15, 10, 8, 0.95) 0%, rgba(25, 18, 12, 0.95) 100%), radial-gradient(circle at center, rgba(139, 69, 19, 0.1) 0%, transparent 70%);
+            border-radius: 20px;
+            padding: 25px;
+            border: 4px solid #DAA520;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9), inset 0 2px 0 rgba(255, 215, 0, 0.4), 0 0 40px rgba(218, 165, 32, 0.5), inset 0 0 30px rgba(101, 67, 33, 0.2);
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+        
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 15px;
+            pointer-events: none;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+            position: relative;
+        }
+        
+        .royal-crown {
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #FFD700 0%, #DAA520 50%, #B8860B 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin: 0 auto 15px;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.5), inset 0 2px 10px rgba(255, 255, 255, 0.3), 0 0 20px rgba(218, 165, 32, 0.4);
+            border: 4px solid #FFD700;
+            position: relative;
+        }
+        
+        .royal-crown::before {
+            content: '';
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            right: -8px;
+            bottom: -8px;
+            border: 2px solid rgba(255, 215, 0, 0.4);
+            border-radius: 50%;
+        }
+        
+        h1 {
+            font-family: 'Cinzel Decorative', serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: #FFE55C;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 1), 1px 1px 0 rgba(139, 69, 19, 0.8), -1px -1px 0 rgba(139, 69, 19, 0.8), 0 0 15px rgba(255, 215, 0, 0.6);
+            margin-bottom: 8px;
+            filter: drop-shadow(0 0 8px rgba(255, 229, 92, 0.4));
+        }
+        
+        .subtitle {
+            font-size: 14px;
+            color: #F0E6DA;
+            font-style: italic;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9), 1px 1px 0 rgba(101, 67, 33, 0.6);
+            font-weight: 500;
+        }
+        
+        .period-badges {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            border: 2px solid #DAA520;
+            background: linear-gradient(135deg, rgba(15, 10, 8, 0.9) 0%, rgba(25, 18, 12, 0.9) 100%);
+            color: #FFE55C;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 1), 1px 1px 0 rgba(139, 69, 19, 0.8);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.3);
+        }
+        
+        .step {
+            display: block;
+        }
+        
+        .step.hidden {
+            display: none;
+        }
+        
+        .upload-area {
+            border: 3px dashed #DAA520;
+            border-radius: 15px;
+            padding: 35px 20px;
+            text-align: center;
+            margin: 20px 0;
+            transition: all 0.4s ease;
+            cursor: pointer;
+            background: linear-gradient(135deg, rgba(10, 8, 5, 0.8) 0%, rgba(20, 15, 10, 0.8) 100%);
+            position: relative;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 215, 0, 0.2);
+        }
+        
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 10px;
+        }
+        
+        .upload-area:hover {
+            background: rgba(45, 31, 21, 0.8);
+            border-color: #FFD700;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(184, 134, 11, 0.3);
+        }
+        
+        .upload-area.active {
+            background: rgba(255, 215, 0, 0.1);
+            border-color: #FFD700;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+            display: block;
+            color: #B8860B;
+        }
+        
+        .upload-area p {
+            color: #F8F0E6;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9), 1px 1px 0 rgba(101, 67, 33, 0.6);
+            font-weight: 500;
+        }
+        
+        .btn,
+        .secondary-btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px 0;
+            font-family: 'Cinzel', serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn {
+            background: linear-gradient(145deg, #DAA520, #FFD700);
+            color: #0a0805;
+            box-shadow: 0 10px 20px rgba(184, 134, 11, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.4), 0 0 15px rgba(255, 215, 0, 0.3);
+            border: 3px solid #FFE55C;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            font-weight: 700;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn:hover:not(:disabled)::before {
+            left: 100%;
+        }
+        
+        .btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(184, 134, 11, 0.6), inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 0 20px rgba(255, 215, 0, 0.4);
+            background: linear-gradient(145deg, #FFD700, #FFE55C);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: linear-gradient(145deg, #4a3d2f, #6b5b47);
+            border-color: #8B7355;
+        }
+        
+        .secondary-btn {
+            background: linear-gradient(135deg, rgba(15, 10, 8, 0.9) 0%, rgba(25, 18, 12, 0.9) 100%);
+            color: #F8F0E6;
+            border: 3px solid #DAA520;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9), 1px 1px 0 rgba(101, 67, 33, 0.6);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 215, 0, 0.2);
+        }
+        
+        .secondary-btn:hover {
+            background: linear-gradient(135deg, rgba(25, 18, 12, 1) 0%, rgba(35, 28, 18, 1) 100%);
+            border-color: #FFE55C;
+            color: #FFE55C;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.3), 0 0 15px rgba(255, 229, 92, 0.2);
+        }
+        
+        .roles-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 20px 0;
+        }
+        
+        .role-card {
+            background: linear-gradient(135deg, rgba(10, 8, 5, 0.8) 0%, rgba(20, 15, 10, 0.8) 100%);
+            border: 3px solid #DAA520;
+            border-radius: 12px;
+            padding: 18px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            position: relative;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.2);
+        }
+        
+        .role-card::before {
+            content: '';
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            right: 6px;
+            bottom: 6px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            pointer-events: none;
+        }
+        
+        .role-card:hover {
+            background: linear-gradient(135deg, rgba(20, 15, 10, 0.9) 0%, rgba(30, 22, 15, 0.9) 100%);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(184, 134, 11, 0.4), inset 0 1px 0 rgba(255, 215, 0, 0.3), 0 0 20px rgba(218, 165, 32, 0.3);
+            border-color: #FFE55C;
+        }
+        
+        .role-card.selected {
+            border-color: #FFE55C;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.2) 0%, rgba(255, 229, 92, 0.15) 100%);
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.5), inset 0 2px 0 rgba(255, 215, 0, 0.4), 0 8px 20px rgba(0, 0, 0, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        .role-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .role-card h3 {
+            font-size: 13px;
+            margin-bottom: 4px;
+            color: #FFE55C;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 1), 1px 1px 0 rgba(139, 69, 19, 0.8), 0 0 8px rgba(255, 229, 92, 0.4);
+            filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.3));
+        }
+        
+        .role-card p {
+            font-size: 11px;
+            color: #F0E6DA;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 1), 1px 1px 0 rgba(101, 67, 33, 0.6);
+            font-weight: 500;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: linear-gradient(135deg, rgba(10, 8, 5, 0.9) 0%, rgba(20, 15, 10, 0.9) 100%);
+            border-radius: 6px;
+            margin: 20px 0;
+            overflow: hidden;
+            border: 3px solid #DAA520;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.2);
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #DAA520, #FFD700, #FFE55C);
+            width: 0%;
+            transition: width 0.5s ease;
+            border-radius: 3px;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+        
+        .status-text {
+            text-align: center;
+            margin: 15px 0;
+            color: #F8F0E6;
+            font-style: italic;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 1), 1px 1px 0 rgba(101, 67, 33, 0.6);
+            font-weight: 500;
+            font-size: 15px;
+        }
+        
+        .result-canvas {
+            width: 100%;
+            max-width: 320px;
+            border-radius: 10px;
+            margin: 20px auto;
+            display: block;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 215, 0, 0.3);
+            border: 4px solid #B8860B;
+        }
+        
+        .social-share {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .social-share button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-family: 'Cinzel', serif;
+            transition: all 0.3s ease;
+            border: 2px solid #B8860B;
+        }
+        
+        .share-download {
+            background: linear-gradient(145deg, #8B4513, #A0522D);
+            color: #F8F0E6;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 1), 1px 1px 0 rgba(101, 67, 33, 0.6);
+            border: 3px solid #DAA520;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 215, 0, 0.2);
+        }
+        
+        .share-download:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(101, 67, 33, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.3), 0 0 15px rgba(218, 165, 32, 0.3);
+            border-color: #FFE55C;
+            background: linear-gradient(145deg, #A0522D, #CD853F);
+        }
+        
+        .share-link {
+            background: linear-gradient(145deg, #654321, #8B4513);
+            color: #F8F0E6;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 1), 1px 1px 0 rgba(101, 67, 33, 0.6);
+            border: 3px solid #DAA520;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 215, 0, 0.2);
+        }
+        
+        .share-link:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(139, 69, 19, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.3), 0 0 15px rgba(184, 134, 11, 0.3);
+            border-color: #FFE55C;
+            background: linear-gradient(145deg, #8B4513, #A0522D);
+        }
+        /* Декоративные углы */
+        
+        .decorative-corners {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #FFD700;
+        }
+        
+        .decorative-corners.top-left {
+            top: 15px;
+            left: 15px;
+            border-right: none;
+            border-bottom: none;
+        }
+        
+        .decorative-corners.top-right {
+            top: 15px;
+            right: 15px;
+            border-left: none;
+            border-bottom: none;
+        }
+        
+        .decorative-corners.bottom-left {
+            bottom: 15px;
+            left: 15px;
+            border-right: none;
+            border-top: none;
+        }
+        
+        .decorative-corners.bottom-right {
+            bottom: 15px;
+            right: 15px;
+            border-left: none;
+            border-top: none;
+        }
+        /* Анимация загрузки */
+        
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+            100% {
+                transform: translateX(100%);
+            }
+        }
+        
+        .shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .shimmer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.4), transparent);
+            animation: shimmer 2s infinite;
+        }
+        /* Улучшенные заголовки */
+        
+        h2 {
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 1), 1px 1px 0 rgba(139, 69, 19, 0.8), 0 0 12px rgba(255, 215, 0, 0.5);
+            color: #FFE55C !important;
+            filter: drop-shadow(0 0 6px rgba(255, 229, 92, 0.3));
+        }
+        /* Контрастные кнопки */
+        
+        .btn:focus,
+        .secondary-btn:focus,
+        .role-card:focus {
+            outline: 3px solid #FFD700;
+            outline-offset: 2px;
+        }
+        /* Мобильные улучшения */
+        
+        @media (max-width: 480px) {
+            .container {
+                margin: 10px;
+                padding: 20px;
+            }
+            .roles-grid {
+                gap: 10px;
+            }
+            .role-card {
+                padding: 15px 8px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="decorative-corners top-left"></div>
+        <div class="decorative-corners top-right"></div>
+        <div class="decorative-corners bottom-left"></div>
+        <div class="decorative-corners bottom-right"></div>
+
+        <div class="header">
+            <div class="royal-crown">⚜️</div>
+            <h1>Исторический портрет</h1>
+            <p class="subtitle">Речь Посполитая • Великое Княжество Литовское</p>
+            <div class="period-badges">
+                <span class="badge">⚔️ XVI-XVII век</span>
+                <span class="badge">👑 6 ролей</span>
+                <span class="badge">🤖 AI сегментация</span>
+                <span class="badge">🎯 Любой фон</span>
+            </div>
+        </div>
+
+        <!-- Шаг 1: Загрузка фото -->
+        <div id="step-upload" class="step">
+            <h2 style="text-align: center; margin-bottom: 25px; font-family: 'Cinzel Decorative', serif; color: #FFD700;">📜 Предоставьте ваш лик</h2>
+
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <span class="upload-icon">🖼️</span>
+                <p><strong>Выберите фото с человеком</strong></p>
+                <p style="opacity: 0.8; margin-top: 5px; font-style: italic;">AI извлечет человека из любого фона</p>
+                <p style="opacity: 0.6; margin-top: 8px; font-size: 11px;">JPG, PNG • До 5MB • Работает с любым фоном</p>
+            </div>
+            <input type="file" id="fileInput" class="file-input" accept="image/*">
+            <button id="nextToRoles" class="btn" disabled>Выбрать роль ⚔️</button>
+        </div>
+
+        <!-- Шаг 2: Выбор роли -->
+        <div id="step-roles" class="step hidden">
+            <h2 style="text-align: center; margin-bottom: 25px; font-family: 'Cinzel Decorative', serif; color: #FFD700;">⚔️ Изберите историческую роль</h2>
+            <div class="roles-grid">
+                <div class="role-card" data-role="hussar">
+                    <span class="role-icon">🏇</span>
+                    <h3>Крылатый гусар</h3>
+                    <p>Элитная кавалерия</p>
+                </div>
+                <div class="role-card" data-role="boyar">
+                    <span class="role-icon">👑</span>
+                    <h3>Литовский боярин</h3>
+                    <p>Знатный дворянин</p>
+                </div>
+                <div class="role-card" data-role="blacksmith">
+                    <span class="role-icon">🔨</span>
+                    <h3>Кузнец</h3>
+                    <p>Мастер-ремесленник</p>
+                </div>
+                <div class="role-card" data-role="knight">
+                    <span class="role-icon">⚔️</span>
+                    <h3>Тевтонский рыцарь</h3>
+                    <p>Крестоносец</p>
+                </div>
+                <div class="role-card" data-role="merchant">
+                    <span class="role-icon">💰</span>
+                    <h3>Ганзейский купец</h3>
+                    <p>Торговец</p>
+                </div>
+                <div class="role-card" data-role="peasant">
+                    <span class="role-icon">🌾</span>
+                    <h3>Крестьянин</h3>
+                    <p>Сельский житель</p>
+                </div>
+            </div>
+            <button id="generateBtn" class="btn" disabled>Сотворить портрет ✨</button>
+            <button class="secondary-btn" onclick="goToUpload()">↩️ Возвратиться</button>
+        </div>
+
+        <!-- Шаг 3: Генерация -->
+        <div id="step-generation" class="step hidden">
+            <h2 style="text-align: center; margin-bottom: 25px; font-family: 'Cinzel Decorative', serif; color: #FFD700;">🎨 Мастер творит портрет...</h2>
+
+            <div class="progress-bar">
+                <div id="progress" class="progress-fill" style="width: 0%;"></div>
+            </div>
+            <p id="status" class="status-text">Приготовление красок и полотна...</p>
+        </div>
+
+        <!-- Шаг 4: Результат -->
+        <div id="step-result" class="step hidden">
+            <h2 style="text-align: center; margin-bottom: 25px; font-family: 'Cinzel Decorative', serif; color: #FFD700;">🎉 Портрет завершен!</h2>
+            <canvas id="resultCanvas" class="result-canvas"></canvas>
+
+            <div class="social-share">
+                <button class="share-download" onclick="downloadResult()">💾 Сохранить</button>
+                <button class="share-link" onclick="shareResult()">📤 Поделиться</button>
+            </div>
+            <button class="btn" onclick="createNew()">🔄 Новый портрет</button>
+            <button class="secondary-btn" onclick="tryAnother()">🎲 Иной образ</button>
+        </div>
+    </div>
+
+    <script>
+        let uploadedImage = null;
+        let selectedRole = null;
+        let uploadedImageElement = null;
+        let bodyPixModel = null;
+        let isAIReady = false;
+
+        const roles = {
+            hussar: {
+                name: 'Крылатый гусар',
+                color: '#8B4513',
+                outfit: '🏇⚔️🛡️',
+                background: '#2D1B0E',
+                backgrounds: [{
+                    name: 'Поле битвы',
+                    colors: ['#4a3d2f', '#6b5b47', '#8b7355'],
+                    scene: 'battlefield'
+                }, {
+                    name: 'Замковый двор',
+                    colors: ['#5c4d3f', '#7a6b5d', '#8f8073'],
+                    scene: 'castle'
+                }, {
+                    name: 'Военный лагерь',
+                    colors: ['#3d2f1f', '#5c453a', '#6b544a'],
+                    scene: 'camp'
+                }]
+            },
+            boyar: {
+                name: 'Литовский боярин',
+                color: '#4B0082',
+                outfit: '👑💍🗡️',
+                background: '#1E0D2A',
+                backgrounds: [{
+                    name: 'Тронный зал',
+                    colors: ['#2f1b69', '#4b2f82', '#654395'],
+                    scene: 'throne'
+                }, {
+                    name: 'Библиотека',
+                    colors: ['#3d2a1c', '#5c453a', '#7a6048'],
+                    scene: 'library'
+                }, {
+                    name: 'Сад усадьбы',
+                    colors: ['#2d4d2d', '#4a6b4a', '#5c8b5c'],
+                    scene: 'garden'
+                }]
+            },
+            blacksmith: {
+                name: 'Кузнец',
+                color: '#2F4F4F',
+                outfit: '🔨⚒️🔥',
+                background: '#0F1515',
+                backgrounds: [{
+                    name: 'Кузница',
+                    colors: ['#1c1c1c', '#ff4500', '#ffa500'],
+                    scene: 'forge'
+                }, {
+                    name: 'Мастерская',
+                    colors: ['#2f2f2f', '#654321', '#8b4513'],
+                    scene: 'workshop'
+                }, {
+                    name: 'Рудник',
+                    colors: ['#1a1a1a', '#4a3d2f', '#6b5b47'],
+                    scene: 'mine'
+                }]
+            },
+            knight: {
+                name: 'Тевтонский рыцарь',
+                color: '#708090',
+                outfit: '⚔️🛡️⛪',
+                background: '#1C1F23',
+                backgrounds: [{
+                    name: 'Собор',
+                    colors: ['#36454f', '#5c6b73', '#7a8b95'],
+                    scene: 'cathedral'
+                }, {
+                    name: 'Крепость',
+                    colors: ['#4a4a4a', '#6b6b6b', '#8b8b8b'],
+                    scene: 'fortress'
+                }, {
+                    name: 'Монастырь',
+                    colors: ['#3d3d3d', '#5c5c5c', '#7a7a7a'],
+                    scene: 'monastery'
+                }]
+            },
+            merchant: {
+                name: 'Ганзейский купец',
+                color: '#8B0000',
+                outfit: '💰💎🏺',
+                background: '#2A0808',
+                backgrounds: [{
+                    name: 'Торговая площадь',
+                    colors: ['#5c1a1a', '#8b2f2f', '#a54545'],
+                    scene: 'market'
+                }, {
+                    name: 'Порт',
+                    colors: ['#2a3a4a', '#4a5a6a', '#6a7a8a'],
+                    scene: 'port'
+                }, {
+                    name: 'Склад',
+                    colors: ['#3d2a1c', '#5c453a', '#7a6048'],
+                    scene: 'warehouse'
+                }]
+            },
+            peasant: {
+                name: 'Крестьянин',
+                color: '#8B4513',
+                outfit: '🌾🧺🏠',
+                background: '#2D1B0E',
+                backgrounds: [{
+                    name: 'Поле',
+                    colors: ['#4a2c2a', '#6b453a', '#8b6348'],
+                    scene: 'field'
+                }, {
+                    name: 'Деревня',
+                    colors: ['#3d2f1f', '#5c453a', '#7a6048'],
+                    scene: 'village'
+                }, {
+                    name: 'Лес',
+                    colors: ['#2d4d2d', '#4a6b4a', '#5c8b5c'],
+                    scene: 'forest'
+                }]
+            }
+        };
+
+        // Инициализация BodyPix для сегментации
+        async function initializeBodyPix() {
+            try {
+                console.log('🤖 Инициализация TensorFlow.js BodyPix...');
+
+                // Загружаем модель BodyPix
+                bodyPixModel = await bodyPix.load({
+                    architecture: 'MobileNetV1',
+                    outputStride: 16,
+                    multiplier: 0.75,
+                    quantBytes: 2
+                });
+
+                console.log('✅ BodyPix готов!');
+                isAIReady = true;
+
+            } catch (error) {
+                console.error('❌ Ошибка инициализации BodyPix:', error);
+                isAIReady = false;
+            }
+        }
+
+        // Функция сегментации человека с помощью BodyPix
+        async function segmentPersonWithBodyPix(imageElement) {
+            try {
+                if (!isAIReady || !bodyPixModel) {
+                    console.log('⚠️ BodyPix не готов, используем fallback');
+                    return null;
+                }
+
+                console.log('🎯 Начинаем BodyPix сегментацию...');
+
+                // Создаем временный canvas для обработки
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = imageElement.width;
+                tempCanvas.height = imageElement.height;
+                tempCtx.drawImage(imageElement, 0, 0);
+
+                // Выполняем сегментацию с помощью BodyPix
+                const segmentation = await bodyPixModel.segmentPerson(tempCanvas, {
+                    flipHorizontal: false,
+                    internalResolution: 'medium',
+                    segmentationThreshold: 0.5
+                });
+
+                console.log('🎯 BodyPix сегментация завершена');
+
+                // Создаем маску из результатов сегментации
+                const maskCanvas = document.createElement('canvas');
+                const maskCtx = maskCanvas.getContext('2d');
+                maskCanvas.width = segmentation.width;
+                maskCanvas.height = segmentation.height;
+
+                // Создаем ImageData для маски
+                const maskImageData = maskCtx.createImageData(segmentation.width, segmentation.height);
+
+                // Заполняем маску на основе результатов сегментации
+                for (let i = 0; i < segmentation.data.length; i++) {
+                    const pixelIndex = i * 4;
+                    const personPixel = segmentation.data[i]; // 1 для человека, 0 для фона
+
+                    // Белый для человека, черный для фона
+                    const value = personPixel ? 255 : 0;
+                    maskImageData.data[pixelIndex] = value; // R
+                    maskImageData.data[pixelIndex + 1] = value; // G
+                    maskImageData.data[pixelIndex + 2] = value; // B
+                    maskImageData.data[pixelIndex + 3] = 255; // A
+                }
+
+                maskCtx.putImageData(maskImageData, 0, 0);
+
+                return {
+                    originalImage: imageElement,
+                    segmentationMask: maskCanvas,
+                    segmentationData: segmentation.data,
+                    width: segmentation.width,
+                    height: segmentation.height
+                };
+
+            } catch (error) {
+                console.error('❌ Ошибка BodyPix сегментации:', error);
+                return null;
+            }
+        }
+
+        // File upload handling
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.querySelector('.upload-area');
+        const nextButton = document.getElementById('nextToRoles');
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Проверка размера файла (5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('⚠️ Файл слишком большой. Максимальный размер: 5MB');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    uploadedImage = e.target.result;
+
+                    // Создаем элемент изображения для дальнейшего использования
+                    uploadedImageElement = new Image();
+                    uploadedImageElement.onload = function() {
+                        uploadArea.innerHTML = `
+                            <span class="upload-icon">✅</span>
+                            <p><strong>Портрет принят!</strong></p>
+                            <p style="opacity: 0.8; font-style: italic;">${file.name}</p>
+                        `;
+                        uploadArea.classList.add('shimmer');
+                        nextButton.disabled = false;
+
+                        setTimeout(() => {
+                            uploadArea.classList.remove('shimmer');
+                        }, 2000);
+                    };
+                    uploadedImageElement.src = uploadedImage;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('active');
+        });
+
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('active');
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('active');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                fileInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        // Navigation
+        nextButton.addEventListener('click', function() {
+            document.getElementById('step-upload').classList.add('hidden');
+            document.getElementById('step-roles').classList.remove('hidden');
+        });
+
+        function goToUpload() {
+            document.getElementById('step-roles').classList.add('hidden');
+            document.getElementById('step-upload').classList.remove('hidden');
+        }
+
+        // Role selection
+        document.querySelectorAll('.role-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedRole = this.dataset.role;
+                document.getElementById('generateBtn').disabled = false;
+
+                // Вибрация на мобильных устройствах
+                if (navigator.vibrate) {
+                    navigator.vibrate(75);
+                }
+            });
+        });
+
+        // Generate portrait
+        document.getElementById('generateBtn').addEventListener('click', function() {
+            document.getElementById('step-roles').classList.add('hidden');
+            document.getElementById('step-generation').classList.remove('hidden');
+            generatePortrait();
+        });
+
+        async function generatePortrait() {
+            const statusEl = document.getElementById('status');
+            const progressEl = document.getElementById('progress');
+
+            const stages = [{
+                progress: 10,
+                text: 'Анализ изображения...'
+            }, {
+                progress: 25,
+                text: 'AI сегментация человека...'
+            }, {
+                progress: 45,
+                text: 'Создание исторического фона...'
+            }, {
+                progress: 65,
+                text: 'Извлечение человека из фона...'
+            }, {
+                progress: 85,
+                text: 'Применение исторических фильтров...'
+            }, {
+                progress: 95,
+                text: 'Финальная композиция...'
+            }, {
+                progress: 100,
+                text: 'Портрет готов!'
+            }];
+
+            for (const stage of stages) {
+                statusEl.textContent = stage.text;
+                progressEl.style.width = stage.progress + '%';
+                await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 600));
+            }
+
+            createHistoricalResult();
+        }
+
+        async function createHistoricalResult() {
+            const canvas = document.getElementById('resultCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 400;
+            canvas.height = 600;
+
+            const role = roles[selectedRole];
+            const selectedBg = role.backgrounds[Math.floor(Math.random() * role.backgrounds.length)];
+
+            // Создание исторического фона
+            const backgroundImage = await createHistoricalBackground(ctx, canvas, selectedBg, selectedRole);
+
+            // Если есть загруженное изображение, применяем AI сегментацию
+            if (uploadedImageElement) {
+                await processImageWithAISegmentation(ctx, canvas, uploadedImageElement, backgroundImage, role);
+            }
+
+            // Декоративная рамка общая
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 8;
+            ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+            // Внутренняя рамка
+            ctx.strokeStyle = '#B8860B';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
+
+            // Угловые украшения
+            const corners = [{
+                x: 30,
+                y: 30
+            }, {
+                x: canvas.width - 30,
+                y: 30
+            }, {
+                x: 30,
+                y: canvas.height - 30
+            }, {
+                x: canvas.width - 30,
+                y: canvas.height - 30
+            }];
+
+            ctx.fillStyle = '#FFD700';
+            corners.forEach(corner => {
+                ctx.beginPath();
+                ctx.arc(corner.x, corner.y, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Внешнее кольцо
+                ctx.strokeStyle = '#B8860B';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(corner.x, corner.y, 10, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+
+            // Заголовок роли
+            ctx.fillStyle = '#FFD700';
+            ctx.strokeStyle = '#0a0505';
+            ctx.lineWidth = 2;
+            ctx.font = 'bold 26px "Cinzel Decorative", serif';
+            ctx.textAlign = 'center';
+            ctx.strokeText(role.name, canvas.width / 2, 50);
+            ctx.fillText(role.name, canvas.width / 2, 50);
+
+            // Символы роли
+            ctx.font = '30px serif';
+            ctx.fillStyle = '#FFD700';
+            ctx.fillText(role.outfit, canvas.width / 2, 480);
+
+            // Подпись эпохи
+            ctx.font = '16px "Cinzel", serif';
+            ctx.fillStyle = '#F4E4BC';
+            ctx.strokeStyle = '#0a0505';
+            ctx.lineWidth = 1;
+            ctx.strokeText('XVI-XVII век', canvas.width / 2, 510);
+            ctx.fillText('XVI-XVII век', canvas.width / 2, 510);
+            ctx.strokeText('Речь Посполитая', canvas.width / 2, 535);
+            ctx.fillText('Речь Посполитая', canvas.width / 2, 535);
+
+            // Подпись автора (водяной знак)
+            ctx.font = '12px "Cinzel", serif';
+            ctx.fillStyle = 'rgba(244, 228, 188, 0.6)';
+            ctx.fillText('Историческая мастерская', canvas.width / 2, canvas.height - 20);
+
+            // Эффект старения по краям
+            ctx.globalAlpha = 0.2;
+            const ageGradient = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width / 1.5);
+            ageGradient.addColorStop(0, 'transparent');
+            ageGradient.addColorStop(1, 'rgba(45, 31, 21, 0.8)');
+            ctx.fillStyle = ageGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = 1;
+
+            document.getElementById('step-generation').classList.add('hidden');
+            document.getElementById('step-result').classList.remove('hidden');
+        }
+
+        async function createHistoricalBackground(ctx, canvas, bgConfig, role) {
+            console.log(`🎨 Создаем фон для роли: ${role}`);
+
+            // Создаем временный canvas для фона
+            const bgCanvas = document.createElement('canvas');
+            const bgCtx = bgCanvas.getContext('2d');
+            bgCanvas.width = canvas.width;
+            bgCanvas.height = canvas.height;
+
+            // Попытка загрузить реальное изображение
+            const bgImage = await loadBackgroundImage(role);
+
+            if (bgImage) {
+                console.log(`🖼️ Используем РЕАЛЬНЫЙ фон: ${bgImage.width}x${bgImage.height}`);
+                // Рисуем реальное изображение фона
+                drawRealBackground(bgCtx, bgCanvas, bgImage, bgConfig);
+            } else {
+                console.log(`🎭 Используем ПРОЦЕДУРНЫЙ фон`);
+                // Fallback: создаем процедурный фон
+                drawProceduralBackground(bgCtx, bgCanvas, bgConfig);
+            }
+
+            // Копируем фон на основной canvas
+            ctx.drawImage(bgCanvas, 0, 0);
+
+            // Возвращаем canvas с фоном для дальнейшего использования
+            return bgCanvas;
+        }
+
+        async function loadBackgroundImage(role) {
+            // Сопоставление ролей с названиями файлов
+            const roleFileMap = {
+                'peasant': 'крестьянин.jpg',
+                'hussar': 'гусар.jpg',
+                'boyar': 'боярин.jpg',
+                'blacksmith': 'кузнец.jpg',
+                'knight': 'рыцарь.jpg',
+                'merchant': 'купец.jpg'
+            };
+
+            // Альтернативные имена файлов (ASCII)
+            const roleFileMapASCII = {
+                'peasant': 'peasant.jpg',
+                'hussar': 'hussar.jpg',
+                'boyar': 'boyar.jpg',
+                'blacksmith': 'blacksmith.jpg',
+                'knight': 'knight.jpg',
+                'merchant': 'merchant.jpg'
+            };
+
+            const fileName = roleFileMap[role];
+            const fileNameASCII = roleFileMapASCII[role];
+            console.log(`🔍 Ищем фон для роли: ${role} → файлы: ${fileName} или ${fileNameASCII}`);
+
+            if (!fileName && !fileNameASCII) {
+                console.log(`❌ Неизвестная роль: ${role}`);
+                return null;
+            }
+
+            // Пробуем загрузить изображения в порядке приоритета
+            const filesToTry = [fileName, fileNameASCII].filter(Boolean);
+
+            for (const currentFile of filesToTry) {
+                try {
+                    console.log(`📂 Пробуем загрузить: background/${currentFile}`);
+
+                    const img = await new Promise((resolve, reject) => {
+                        const image = new Image();
+
+                        image.onload = () => {
+                            console.log(`✅ УСПЕШНО загружен фон: background/${currentFile}`);
+                            console.log(`📏 Размеры фона: ${image.width}x${image.height}`);
+                            resolve(image);
+                        };
+
+                        image.onerror = (error) => {
+                            console.log(`❌ Не удалось загрузить: background/${currentFile}`);
+                            reject(error);
+                        };
+
+                        image.src = `background/${currentFile}`;
+                    });
+
+                    return img; // Успешно загрузили
+
+                } catch (error) {
+                    console.log(`⚠️ Ошибка загрузки ${currentFile}:`, error);
+                    continue; // Пробуем следующий файл
+                }
+            }
+
+            console.log('🔄 Все попытки загрузки не удались, используем процедурную генерацию');
+            return null;
+        }
+
+        function drawRealBackground(ctx, canvas, bgImage, bgConfig) {
+            // Рисуем реальное изображение, масштабируя под canvas
+            const scale = Math.max(canvas.width / bgImage.width, canvas.height / bgImage.height);
+            const scaledWidth = bgImage.width * scale;
+            const scaledHeight = bgImage.height * scale;
+            const offsetX = (canvas.width - scaledWidth) / 2;
+            const offsetY = (canvas.height - scaledHeight) / 2;
+
+            ctx.drawImage(bgImage, offsetX, offsetY, scaledWidth, scaledHeight);
+
+            // Добавляем исторический фильтр поверх реального изображения
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.globalAlpha = 0.6;
+
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            bgConfig.colors.forEach((color, i) => {
+                gradient.addColorStop(i / (bgConfig.colors.length - 1), color + '80');
+            });
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Возвращаем к нормальному режиму
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+
+            // Добавляем текстуру старины
+            addVintageTexture(ctx, canvas);
+        }
+
+        function drawProceduralBackground(ctx, canvas, bgConfig) {
+            // Создаем многослойный процедурный фон (существующий код)
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            bgConfig.colors.forEach((color, i) => {
+                gradient.addColorStop(i / (bgConfig.colors.length - 1), color);
+            });
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Добавляем текстуру старины
+            addVintageTexture(ctx, canvas);
+
+            // Добавляем атмосферные элементы для каждого типа сцены
+            addSceneElements(ctx, canvas, bgConfig.scene);
+        }
+
+        function addVintageTexture(ctx, canvas) {
+            ctx.globalAlpha = 0.15;
+            for (let i = 0; i < 300; i++) {
+                const brightness = Math.random() * 100;
+                ctx.fillStyle = `rgba(${brightness}, ${brightness * 0.8}, ${brightness * 0.6}, 0.1)`;
+                ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 2, 2);
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        async function processImageWithAISegmentation(ctx, canvas, userImage, backgroundCanvas, role) {
+            console.log('🤖 Начинаем AI сегментацию...');
+
+            // Пробуем использовать BodyPix для сегментации
+            let segmentationResult = null;
+            if (isAIReady) {
+                try {
+                    console.log('🎯 Использую BodyPix для сегментации');
+                    segmentationResult = await segmentPersonWithBodyPix(userImage);
+                } catch (error) {
+                    console.error('❌ Ошибка BodyPix:', error);
+                }
+            }
+
+            if (segmentationResult) {
+                // Используем результат BodyPix
+                await processImageWithAIMask(ctx, canvas, userImage, backgroundCanvas, segmentationResult, role);
+            } else {
+                // Fallback к алгоритму белого фона
+                console.log('🔄 Fallback: используем алгоритм белого фона');
+                await processImageWithBackgroundReplacement(ctx, canvas, userImage, backgroundCanvas, role);
+            }
+        }
+
+        async function processImageWithAIMask(ctx, canvas, userImage, backgroundCanvas, segmentationResult, role) {
+            console.log('🎨 Обработка с BodyPix маской');
+
+            // Создаем временные canvas для обработки
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = 400;
+            tempCanvas.height = 500;
+
+            // Масштабируем изображение пользователя
+            const scale = Math.min(tempCanvas.width / userImage.width, tempCanvas.height / userImage.height);
+            const scaledWidth = userImage.width * scale;
+            const scaledHeight = userImage.height * scale;
+            const offsetX = (tempCanvas.width - scaledWidth) / 2;
+            const offsetY = (tempCanvas.height - scaledHeight) / 2;
+
+            // Рисуем изображение пользователя на временный canvas
+            tempCtx.drawImage(userImage, offsetX, offsetY, scaledWidth, scaledHeight);
+
+            // Получаем данные пикселей
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+
+            // Создаем маску из результатов BodyPix
+            const mask = new Uint8ClampedArray(tempCanvas.width * tempCanvas.height);
+
+            // Масштабируем данные сегментации под размер нашего canvas
+            const segWidth = segmentationResult.width;
+            const segHeight = segmentationResult.height;
+            const segData = segmentationResult.segmentationData;
+
+            for (let y = 0; y < tempCanvas.height; y++) {
+                for (let x = 0; x < tempCanvas.width; x++) {
+                    // Преобразуем координаты из нашего canvas в координаты сегментации
+                    const segX = Math.floor((x - offsetX) * segWidth / scaledWidth);
+                    const segY = Math.floor((y - offsetY) * segHeight / scaledHeight);
+
+                    const pixelIndex = y * tempCanvas.width + x;
+
+                    if (segX >= 0 && segX < segWidth && segY >= 0 && segY < segHeight) {
+                        const segIndex = segY * segWidth + segX;
+                        // BodyPix возвращает 1 для человека, 0 для фона
+                        mask[pixelIndex] = segData[segIndex] ? 255 : 0;
+                    } else {
+                        // За пределами изображения - считаем фоном
+                        mask[pixelIndex] = 0;
+                    }
+                }
+            }
+
+            // Применяем сглаживание к маске
+            const smoothedMask = applySmoothingToMask(mask, tempCanvas.width, tempCanvas.height);
+
+            // Остальная часть композиции идентична предыдущей функции
+            await composeImageWithMask(ctx, canvas, tempCanvas, backgroundCanvas, data, smoothedMask, role);
+        }
+
+        async function composeImageWithMask(ctx, canvas, tempCanvas, backgroundCanvas, imageData, smoothedMask, role) {
+            // Создаем финальный результат
+            const resultCanvas = document.createElement('canvas');
+            const resultCtx = resultCanvas.getContext('2d');
+            resultCanvas.width = tempCanvas.width;
+            resultCanvas.height = tempCanvas.height;
+
+            // Получаем данные фона
+            const bgCanvas = document.createElement('canvas');
+            const bgCtx = bgCanvas.getContext('2d');
+            bgCanvas.width = tempCanvas.width;
+            bgCanvas.height = tempCanvas.height;
+
+            // Масштабируем фон под размер изображения
+            const bgScale = Math.max(tempCanvas.width / backgroundCanvas.width, tempCanvas.height / backgroundCanvas.height);
+            const bgScaledWidth = backgroundCanvas.width * bgScale;
+            const bgScaledHeight = backgroundCanvas.height * bgScale;
+            const bgOffsetX = (tempCanvas.width - bgScaledWidth) / 2;
+            const bgOffsetY = (tempCanvas.height - bgScaledHeight) / 2;
+
+            bgCtx.drawImage(backgroundCanvas, bgOffsetX, bgOffsetY, bgScaledWidth, bgScaledHeight);
+            const backgroundData = bgCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+
+            // Смешиваем изображение с фоном используя маску
+            const resultData = resultCtx.createImageData(tempCanvas.width, tempCanvas.height);
+
+            for (let i = 0; i < imageData.length; i += 4) {
+                const pixelIndex = Math.floor(i / 4);
+                const maskValue = smoothedMask[pixelIndex] / 255; // От 0 до 1
+
+                // Применяем исторический фильтр к изображению пользователя
+                const userR = imageData[i];
+                const userG = imageData[i + 1];
+                const userB = imageData[i + 2];
+
+                // Сепия эффект
+                const sepiaR = Math.min(255, (userR * 0.393) + (userG * 0.769) + (userB * 0.189));
+                const sepiaG = Math.min(255, (userR * 0.349) + (userG * 0.686) + (userB * 0.168));
+                const sepiaB = Math.min(255, (userR * 0.272) + (userG * 0.534) + (userB * 0.131));
+
+                // Цвета фона
+                const bgR = backgroundData.data[i];
+                const bgG = backgroundData.data[i + 1];
+                const bgB = backgroundData.data[i + 2];
+
+                // Смешиваем используя маску
+                resultData.data[i] = sepiaR * maskValue + bgR * (1 - maskValue);
+                resultData.data[i + 1] = sepiaG * maskValue + bgG * (1 - maskValue);
+                resultData.data[i + 2] = sepiaB * maskValue + bgB * (1 - maskValue);
+                resultData.data[i + 3] = 255;
+            }
+
+            resultCtx.putImageData(resultData, 0, 0);
+
+            // Рисуем результат в портретной области на основном canvas
+            const portraitX = 50;
+            const portraitY = 80;
+            const portraitWidth = 300;
+            const portraitHeight = 350;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(portraitX, portraitY, portraitWidth, portraitHeight, 10);
+            ctx.clip();
+
+            // Масштабируем результат под портретную область
+            const portraitScale = Math.max(portraitWidth / resultCanvas.width, portraitHeight / resultCanvas.height);
+            const finalWidth = resultCanvas.width * portraitScale;
+            const finalHeight = resultCanvas.height * portraitScale;
+            const finalX = portraitX + (portraitWidth - finalWidth) / 2;
+            const finalY = portraitY + (portraitHeight - finalHeight) / 2;
+
+            ctx.drawImage(resultCanvas, finalX, finalY, finalWidth, finalHeight);
+            ctx.restore();
+
+            // Добавляем декоративную рамку
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(portraitX - 2, portraitY - 2, portraitWidth + 4, portraitHeight + 4);
+
+            ctx.strokeStyle = '#B8860B';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(portraitX - 6, portraitY - 6, portraitWidth + 12, portraitHeight + 12);
+
+            // Добавляем легкую патину
+            ctx.globalAlpha = 0.15;
+            const patina = ctx.createLinearGradient(portraitX, portraitY, portraitX + portraitWidth, portraitY + portraitHeight);
+            patina.addColorStop(0, 'rgba(139, 69, 19, 0.3)');
+            patina.addColorStop(1, 'rgba(184, 134, 11, 0.3)');
+            ctx.fillStyle = patina;
+            ctx.fillRect(portraitX, portraitY, portraitWidth, portraitHeight);
+            ctx.globalAlpha = 1;
+        }
+
+        async function processImageWithBackgroundReplacement(ctx, canvas, userImage, backgroundCanvas, role) {
+            // Создаем временные canvas для обработки
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = 400;
+            tempCanvas.height = 500;
+
+            // Масштабируем изображение пользователя
+            const scale = Math.min(tempCanvas.width / userImage.width, tempCanvas.height / userImage.height);
+            const scaledWidth = userImage.width * scale;
+            const scaledHeight = userImage.height * scale;
+            const offsetX = (tempCanvas.width - scaledWidth) / 2;
+            const offsetY = (tempCanvas.height - scaledHeight) / 2;
+
+            // Рисуем изображение пользователя на временный canvas
+            tempCtx.drawImage(userImage, offsetX, offsetY, scaledWidth, scaledHeight);
+
+            // Получаем данные пикселей для обработки
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+
+            // Создаем маску для белого фона
+            const mask = new Uint8ClampedArray(tempCanvas.width * tempCanvas.height);
+
+            // Параметры для распознавания белого фона
+            const whiteThreshold = 240; // Порог для определения белого (от 240 до 255)
+            const tolerance = 15; // Допустимое отклонение
+
+            // Проходим по всем пикселям и создаем маску
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const alpha = data[i + 3];
+
+                // Проверяем, является ли пиксель белым или близким к белому
+                const isWhiteish = (
+                    alpha > 200 && // Пиксель не прозрачный
+                    r >= whiteThreshold - tolerance &&
+                    g >= whiteThreshold - tolerance &&
+                    b >= whiteThreshold - tolerance &&
+                    Math.abs(r - g) < tolerance &&
+                    Math.abs(r - b) < tolerance &&
+                    Math.abs(g - b) < tolerance
+                );
+
+                const pixelIndex = Math.floor(i / 4);
+                mask[pixelIndex] = isWhiteish ? 0 : 255; // 0 = заменить фон, 255 = оставить объект
+            }
+
+            // Применяем сглаживание к маске (blur effect)
+            const smoothedMask = applySmoothingToMask(mask, tempCanvas.width, tempCanvas.height);
+
+            // Используем общую функцию композиции
+            await composeImageWithMask(ctx, canvas, tempCanvas, backgroundCanvas, data, smoothedMask, role);
+        }
+
+        function applySmoothingToMask(mask, width, height) {
+            const smoothed = new Uint8ClampedArray(mask.length);
+            const kernelSize = 2; // Размер ядра для размытия
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let sum = 0;
+                    let count = 0;
+
+                    // Применяем размытие
+                    for (let ky = -kernelSize; ky <= kernelSize; ky++) {
+                        for (let kx = -kernelSize; kx <= kernelSize; kx++) {
+                            const nx = x + kx;
+                            const ny = y + ky;
+
+                            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                sum += mask[ny * width + nx];
+                                count++;
+                            }
+                        }
+                    }
+
+                    smoothed[y * width + x] = sum / count;
+                }
+            }
+
+            return smoothed;
+        }
+
+        function addSceneElements(ctx, canvas, scene) {
+            ctx.globalAlpha = 0.2;
+            ctx.fillStyle = 'rgba(139, 69, 19, 0.3)';
+
+            switch (scene) {
+                case 'battlefield':
+                    // Силуэты знамен
+                    for (let i = 0; i < 3; i++) {
+                        const x = Math.random() * canvas.width;
+                        const y = canvas.height * 0.3;
+                        drawFlag(ctx, x, y);
+                    }
+                    break;
+
+                case 'castle':
+                    // Архитектурные элементы
+                    drawCastleElements(ctx, canvas);
+                    break;
+
+                case 'forge':
+                    // Эффект огня и искр
+                    drawForgeEffects(ctx, canvas);
+                    break;
+
+                case 'cathedral':
+                    // Готические арки
+                    drawCathedralArches(ctx, canvas);
+                    break;
+
+                case 'forest':
+                    // Силуэты деревьев
+                    drawTreeSilhouettes(ctx, canvas);
+                    break;
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        function drawFlag(ctx, x, y) {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y - 60);
+            ctx.lineTo(x + 40, y - 45);
+            ctx.lineTo(x, y - 30);
+            ctx.fill();
+        }
+
+        function drawCastleElements(ctx, canvas) {
+            // Простые силуэты башен
+            ctx.fillRect(canvas.width * 0.1, canvas.height * 0.4, 30, canvas.height * 0.3);
+            ctx.fillRect(canvas.width * 0.8, canvas.height * 0.3, 25, canvas.height * 0.4);
+        }
+
+        function drawForgeEffects(ctx, canvas) {
+            // Имитация искр и огня
+            ctx.fillStyle = 'rgba(255, 69, 0, 0.4)';
+            for (let i = 0; i < 10; i++) {
+                const x = Math.random() * canvas.width;
+                const y = canvas.height * 0.7 + Math.random() * 100;
+                ctx.beginPath();
+                ctx.arc(x, y, Math.random() * 3 + 1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function drawCathedralArches(ctx, canvas) {
+            // Готические арки
+            ctx.strokeStyle = 'rgba(139, 69, 19, 0.3)';
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 2; i++) {
+                const x = canvas.width * (0.3 + i * 0.4);
+                ctx.beginPath();
+                ctx.arc(x, canvas.height * 0.6, 40, Math.PI, 0);
+                ctx.stroke();
+            }
+        }
+
+        function drawTreeSilhouettes(ctx, canvas) {
+            // Силуэты деревьев
+            for (let i = 0; i < 4; i++) {
+                const x = Math.random() * canvas.width;
+                const height = 60 + Math.random() * 40;
+
+                // Ствол
+                ctx.fillRect(x - 2, canvas.height * 0.6, 4, height);
+
+                // Крона
+                ctx.beginPath();
+                ctx.arc(x, canvas.height * 0.6 - height + 20, 20, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function downloadResult() {
+            const canvas = document.getElementById('resultCanvas');
+            const link = document.createElement('a');
+            link.download = `historical-portrait-${selectedRole}-${new Date().getTime()}.png`;
+            link.href = canvas.toDataURL('image/png', 1.0);
+            link.click();
+
+            // Обратная связь
+            if (navigator.vibrate) {
+                navigator.vibrate([200, 100, 200]);
+            }
+        }
+
+        function shareResult() {
+            const canvas = document.getElementById('resultCanvas');
+
+            if (navigator.share && navigator.canShare) {
+                canvas.toBlob(blob => {
+                    const file = new File([blob], 'historical-portrait.png', {
+                        type: 'image/png'
+                    });
+                    if (navigator.canShare({
+                            files: [file]
+                        })) {
+                        navigator.share({
+                            title: 'Мой исторический портрет',
+                            text: `Я создал портрет в роли "${roles[selectedRole].name}" в эпоху Речи Посполитой!`,
+                            files: [file]
+                        }).catch(console.error);
+                    }
+                });
+            } else {
+                // Резервный способ - копирование ссылки
+                navigator.clipboard.writeText(window.location.href)
+                    .then(() => alert('📋 Ссылка скопирована в буфер обмена!'))
+                    .catch(() => alert('🔗 Ссылка: ' + window.location.href));
+            }
+        }
+
+        function createNew() {
+            uploadedImage = null;
+            uploadedImageElement = null;
+            selectedRole = null;
+            document.getElementById('step-result').classList.add('hidden');
+            document.getElementById('step-upload').classList.remove('hidden');
+            document.getElementById('nextToRoles').disabled = true;
+            document.getElementById('generateBtn').disabled = true;
+            document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+
+            // Сброс области загрузки
+            document.querySelector('.upload-area').innerHTML = `
+                <span class="upload-icon">🖼️</span>
+                <p><strong>Прикоснитесь для выбора портрета</strong></p>
+                <p style="opacity: 0.8; margin-top: 5px; font-style: italic;">или перенесите изображение сюда</p>
+                <p style="opacity: 0.6; margin-top: 8px; font-size: 11px;">Поддерживается: JPG, PNG • До 5MB</p>
+            `;
+
+            // Сброс поля файла
+            document.getElementById('fileInput').value = '';
+        }
+
+        function tryAnother() {
+            document.getElementById('step-result').classList.add('hidden');
+            document.getElementById('step-generation').classList.remove('hidden');
+            generatePortrait();
+        }
+
+        // Мобильные оптимизации
+        if ('ontouchstart' in window) {
+            document.body.style.webkitUserSelect = 'none';
+            document.body.style.webkitTouchCallout = 'none';
+        }
+
+        // Предотвращение зума на iOS
+        document.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
+        });
+
+        // Инициализация BodyPix при загрузке
+        window.addEventListener('load', async() => {
+            console.log('⚜️ Исторический портрет v5.1 - BodyPix Edition');
+            console.log('🚀 Загружаем TensorFlow.js BodyPix...');
+
+            // Инициализируем BodyPix
+            await initializeBodyPix();
+
+            if (isAIReady) {
+                console.log('🤖 BodyPix AI сегментация готова!');
+                console.log('🎯 Поддержка любых фонов с BodyPix');
+                console.log('🔄 Fallback к алгоритму белого фона при ошибках');
+            } else {
+                console.log('⚠️ BodyPix не загружен, используется алгоритм белого фона');
+            }
+
+            console.log('🎨 Поддержка реальных фонов из папки background/');
+            console.log('🌾 Фон крестьянина: background/крестьянин.jpg');
+            console.log('✨ Сглаживание краев и исторические фильтры');
+            console.log('👑 Работает полностью локально');
+        });
+    </script>
+</body>
+
+</html>
